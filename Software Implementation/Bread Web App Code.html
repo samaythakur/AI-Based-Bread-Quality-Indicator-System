@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Webpage title -->
+  <title>Bread Quality Monitor</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* COLOR VARIABLES-Centralized theme colors for easy UI customization */
+    :root {
+      --bg:       #080C0A;
+      --surface:  #0F1510;
+      --surface2: #141C16;
+      --border:   #1E2B20;
+      --fresh:    #3DFF7A;
+      --moldy:    #FF3D3D;
+      --ai-blue:  #3DA9FF;
+      --gas-yel:  #FFD93D;
+      --dim:      #3A4A3D;
+      --text:     #C8DCC9;
+      --muted:    #4A5E4D;
+      --glow-f:   rgba(61,255,122,0.15);
+      --glow-m:   rgba(255,61,61,0.15);
+    }
+    * {
+      margin:0;
+      padding:0;
+      box-sizing:border-box;
+    }
+
+    /*  MAIN PAGE STYLING */
+    body {
+      font-family: 'Syne', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 40px;
+    }
+
+    /* SCANLINE EFFECT-Gives futuristic embedded-system UI appearance */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.08) 2px,
+        rgba(0,0,0,0.08) 4px
+      );
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    /* HEADER SECTION */
+    header {
+      text-align: center;
+      margin-bottom: 24px;
+
+      width: 100%;
+      max-width: 520px;
+    }
+    .header-tag {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    header h1 {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      color: #fff;
+      line-height: 1.2;
+    }
+    header h1 span {
+      color: var(--fresh);
+    }
+
+    /* CONNECT SECTION-Used to enter ESP32 IP address */
+    .connect-row {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+      max-width: 520px;
+      margin-bottom: 20px;
+    }
+    .connect-row input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 11px 14px;
+      border-radius: 10px;
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .connect-row input:focus {
+      border-color: var(--dim);
+    }
+    .connect-row button {
+      background: var(--fresh);
+      color: #060C08;
+      border: none;
+      padding: 11px 22px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .5px;
+      transition: opacity .15s, transform .1s;
+    }
+    .connect-row button:hover {
+      opacity: .85;
+    }
+    .connect-row button:active {
+      transform: scale(.97);
+    }
+
+    /* MAIN STATUS CARD-Displays overall bread condition */
+    .main-card {
+      width: 100%;
+      max-width: 520px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px 24px 28px;
+      margin-bottom: 14px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      transition: border-color .4s, box-shadow .4s;
+    }
+    .main-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 20px;
+      opacity: 0;
+      transition: opacity .4s;
+      pointer-events: none;
+    }
+
+    /* Fresh bread styling */
+    .main-card.fresh  {
+      border-color: var(--fresh);
+      box-shadow: 0 0 40px var(--glow-f);
+    }
+    .main-card.fresh::after  {
+      background: radial-gradient(
+        ellipse at 50% 100%,
+        var(--glow-f),
+        transparent 70%
+      );
+      opacity:1;
+    }
+    /* Moldy bread styling */
+    .main-card.moldy  {
+      border-color: var(--moldy);
+      box-shadow: 0 0 40px var(--glow-m);
+    }
+    .main-card.moldy::after  {
+      background: radial-gradient(
+        ellipse at 50% 100%,
+        var(--glow-m),
+        transparent 70%
+      );
+      opacity:1;
+    }
+    .status-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .status-big {
+      font-size: 72px;
+      font-weight: 800;
+      letter-spacing: 6px;
+      line-height: 1;
+      transition: color .4s;
+      color: var(--dim);
+    }
+    .status-big.fresh {
+      color: var(--fresh);
+    }
+    .status-big.moldy {
+      color: var(--moldy);
+    }
+    .status-reason {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 10px;
+      min-height: 18px;
+      font-family: 'Space Mono', monospace;
+    }
+
+    /* LIVE STATUS INDICATOR */
+    .pulse-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .pulse-dot.live {
+      background: var(--fresh);
+      animation: pulse 1.4s infinite;
+    }
+    @keyframes pulse {
+      0%,100% {
+        opacity:1;
+        transform:scale(1);
+      }
+      50% {
+        opacity:.4;
+        transform:scale(.7);
+      }
+    }
+
+    /* SENSOR DATA GRID-Shows gas sensor + AI result */
+    .sensor-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      width: 100%;
+      max-width: 520px;
+      margin-bottom: 14px;
+    }
+    .sensor-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px 14px;
+      text-align: center;
+    }
+    .sensor-card h3 {
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .sensor-val {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--dim);
+      transition: color .3s;
+    }
+    .sensor-sub {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+    .val-fresh {
+      color: var(--fresh);
+    }
+    .val-moldy {
+      color: var(--moldy);
+    }
+    .val-blue {
+      color: var(--ai-blue);
+    }
+
+    /* CAMERA STREAM CARD-Displays ESP32-CAM live feed */
+    .cam-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 16px;
+      width: 100%;
+      max-width: 520px;
+      margin-bottom: 14px;
+    }
+    .cam-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .cam-header h3 {
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      flex: 1;
+    }
+    .cam-status {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+    }
+    .cam-wrap {
+      width: 100%;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #060A07;
+      min-height: 160px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .cam-wrap img {
+      width: 100%;
+      display: block;
+      border-radius: 10px;
+    }
+    .cam-placeholder {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    /* SYSTEM STATISTICS */
+    .stats-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      width: 100%;
+      max-width: 520px;
+      margin-bottom: 14px;
+    }
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      text-align: center;
+    }
+    .stat-val {
+      font-size: 26px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .stat-lbl {
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /*  EVENT LOG PANEL-Displays live system activity */
+    .log-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px 18px;
+      width: 100%;
+      max-width: 520px;
+    }
+    .log-card h3 {
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    #log {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      line-height: 2;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    #log::-webkit-scrollbar {
+      width: 4px;
+    }
+    #log::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    #log::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+    .log-fresh {
+      color: var(--fresh);
+    }
+    .log-moldy {
+      color: var(--moldy);
+    }
+    .log-ai {
+      color: var(--ai-blue);
+    }
+    .log-info {
+      color: var(--muted);
+    }
+    .log-time {
+      color: #2A3A2C;
+    }
+    /* FOOTER */
+    footer {
+      margin-top: 20px;
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      color: #1E2B20;
+      text-align: center;
+      line-height: 2;
+    }
+  </style>
+</head>
+<body>
+
+<!--  HEADER -->
+<header>
+  <div class="header-tag">
+    RIT · Embedded ML · Group Project
+  </div>
+  <h1>
+    AI-Based <span>Bread Quality</span><br>
+    Indicator Monitor
+  </h1>
+</header>
+
+<!-- ESP32 CONNECTION SECTION -->
+<div class="connect-row">
+  <!-- ESP32 IP address input -->
+  <input
+    type="text"
+    id="esp-ip"
+    placeholder="ESP32-CAM IP (e.g. 192.168.1.55)"
+    value=""
+  >
+  <!-- Connect button -->
+  <button onclick="connect()">
+    Connect
+  </button>
+</div>
+
+<!--  MAIN STATUS DISPLAY -->
+<div class="main-card" id="main-card">
+  <div class="status-label">
+    <span class="pulse-dot" id="pulse-dot"></span>
+    BREAD STATUS
+  </div>
+  <div class="status-big" id="status-text">
+  </div>
+  <div class="status-reason" id="status-reason">
+    Enter ESP32 IP and press Connect
+  </div>
+</div>
+
+<!--  SENSOR STATUS CARDS -->
+<div class="sensor-grid">
+  <!-- MQ135 Gas sensor -->
+  <div class="sensor-card">
+    <h3>MQ-135 Gas Sensor</h3>
+    <div class="sensor-val" id="gas-val">--</div>
+    <div class="sensor-sub" id="gas-sub">
+      Waiting...
+    </div>
+  </div>
+  <!-- AI prediction card -->
+  <div class="sensor-card">
+    <h3>CNN / AI Camera</h3>
+    <div class="sensor-val" id="ai-val">--</div>
+    <div class="sensor-sub" id="ai-sub">
+      Waiting...
+    </div>
+  </div>
+</div>
+
+<!--  LIVE CAMERA STREAM -->
+<div class="cam-card">
+  <div class="cam-header">
+    <h3>Live Camera — ESP32-CAM</h3>
+    <span class="cam-status" id="cam-status">
+      Disconnected
+    </span>
+  </div>
+  <div class="cam-wrap" id="cam-wrap">
+    <div class="cam-placeholder" id="cam-placeholder">
+      Camera feed will appear here<br>
+      after connecting to ESP32
+    </div>
+  </div>
+</div>
+
+<!--  SYSTEM STATISTICS -->
+<div class="stats-row">
+  <div class="stat">
+    <div class="stat-val" id="stat-reads">0</div>
+    <div class="stat-lbl">Readings</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val" id="stat-alerts">0</div>
+    <div class="stat-lbl">Alerts</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val" id="stat-uptime">0s</div>
+    <div class="stat-lbl">Uptime</div>
+  </div>
+</div>
+
+<!--  LIVE EVENT LOG -->
+<div class="log-card">
+  <h3>Live Event Log</h3>
+  <div id="log">
+    <span class="log-info">
+      Waiting for connection...
+    </span>
+  </div>
+</div>
+
+<!--  FOOTER -->
+<footer>
+  Naveen L · Samay Thakur · Vinod Naik · Subham Kumar Singh<br>
+  Guided by Dr. M K Pushpa · Ramaiah Institute of Technology
+</footer>
+<script>
+
+// GLOBAL VARIABLES
+let espIp     = '';
+let pollId    = null;
+let reads     = 0;
+let alerts    = 0;
+let startTime = null;
+let camImg    = null;
+let connected = false;
+
+// LOGGING FUNCTION- Adds live system messages to log panel
+function addLog(msg, cls) {
+  const t  = new Date().toLocaleTimeString();
+  const el = document.getElementById('log');
+  const d  = document.createElement('div');
+  d.innerHTML =
+    `<span class="log-time">[${t}]</span>
+     <span class="${cls || 'log-info'}">${msg}</span>`;
+  // Add newest log on top
+  el.prepend(d);
+  // Keep only latest 25 logs
+  while (el.children.length > 25)
+    el.removeChild(el.lastChild);
+}
+
+// UPDATE USER INTERFACE-Updates all UI values using ESP32 JSON response
+function updateUI(data) {
+
+  reads++;
+
+  // ===== SENSOR STATES =====
+  const gasB = data.gas_result === 'SPOILED';
+  const aiB  = data.ai_result  === 'MOLDY';
+
+  // FINAL STATUS
+  const spoiled = gasB || aiB;
+
+  // ALERT COUNTER
+  if (spoiled)
+    alerts++;
+
+  // ===== UPTIME =====
+  if (startTime) {
+
+    const s = Math.round(
+      (Date.now() - startTime) / 1000
+    );
+
+    document.getElementById('stat-uptime').textContent =
+      s < 60
+      ? s + 's'
+      : Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+  }
+
+  document.getElementById('stat-reads').textContent  = reads;
+  document.getElementById('stat-alerts').textContent = alerts;
+
+  // ===== MAIN STATUS CARD =====
+  const card   = document.getElementById('main-card');
+  const text   = document.getElementById('status-text');
+  const reason = document.getElementById('status-reason');
+  const dot    = document.getElementById('pulse-dot');
+
+  // RESET CLASSES PROPERLY
+  card.classList.remove('fresh', 'moldy');
+  text.classList.remove('fresh', 'moldy');
+
+  // APPLY NEW STATUS
+  if (spoiled) {
+
+    card.classList.add('moldy');
+    text.classList.add('moldy');
+
+    text.textContent = 'SPOILED';
+
+  }
+  else {
+
+    card.classList.add('fresh');
+    text.classList.add('fresh');
+
+    text.textContent = 'FRESH';
+  }
+
+  dot.className = 'pulse-dot live';
+
+  // ===== STATUS MESSAGE =====
+  if (gasB && aiB) {
+
+    reason.textContent =
+      'Gas sensor + CNN both flagged spoilage!';
+
+  }
+  else if (gasB) {
+
+    reason.textContent =
+      'MQ-135 detected spoilage gases';
+
+  }
+  else if (aiB) {
+
+    reason.textContent =
+      'CNN model detected mould on bread';
+
+  }
+  else {
+
+    reason.textContent =
+      'No spoilage detected — bread is fresh';
+  }
+
+  // ===== GAS CARD =====
+  const gasEl  = document.getElementById('gas-val');
+  const gasSub = document.getElementById('gas-sub');
+
+  gasEl.textContent =
+    data.gas_result || '--';
+
+  gasEl.className =
+    'sensor-val ' +
+    (gasB ? 'val-moldy' : 'val-fresh');
+
+  gasSub.textContent =
+    gasB
+    ? '⚠ Spoilage gas detected'
+    : '✓ Clean air';
+
+  // ===== AI CARD =====
+  const aiEl  = document.getElementById('ai-val');
+  const aiSub = document.getElementById('ai-sub');
+
+  const conf =
+    data.ai_confidence ?? 0;
+
+  if (data.ai_result === 'MOLDY') {
+
+    aiEl.textContent  = 'MOLDY';
+    aiEl.className    = 'sensor-val val-moldy';
+    aiSub.textContent = conf + '% confidence';
+
+  }
+  else if (data.ai_result === 'FRESH') {
+
+    aiEl.textContent  = 'FRESH';
+    aiEl.className    = 'sensor-val val-fresh';
+    aiSub.textContent = conf + '% confidence';
+
+  }
+  else {
+
+    aiEl.textContent  = data.ai_result || '--';
+    aiEl.className    = 'sensor-val val-blue';
+
+    aiSub.textContent =
+      data.server_online
+      ? 'Analysing...'
+      : 'Python server offline';
+  }
+
+  // ===== LOGGING =====
+  const logMsg =
+    `Gas:${data.gas_result} |
+     AI:${data.ai_result}(${conf}%)
+     → ${spoiled ? 'SPOILED' : 'FRESH'}`;
+
+  addLog(
+    logMsg,
+    spoiled ? 'log-moldy' : 'log-fresh'
+  );
+
+  if (
+    data.ai_result === 'MOLDY' ||
+    data.ai_result === 'FRESH'
+  ) {
+
+    addLog(
+      `CNN: ${data.ai_result} — ${conf}% confident`,
+      'log-ai'
+    );
+  }
+}
+
+// FETCH SENSOR DATA FROM ESP32- ESP32 serves JSON at /data
+async function fetchData() {
+  try {
+    const res = await fetch(
+      'http://' + espIp + '/data',
+      {
+        signal: AbortSignal.timeout(4000)
+      }
+    );
+    if (!res.ok)
+      throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    updateUI(data);
+    document.getElementById('cam-status').textContent =
+      'Connected';
+  }
+  catch (e) {
+    addLog(
+      'ESP32 unreachable: ' + e.message,
+      'log-info'
+    );
+    document.getElementById('cam-status').textContent =
+      'Disconnected';
+  }
+}
+
+// SETUP CAMERA STREAM-Creates live MJPEG stream from ESP32-CAM
+function setupCamera() {
+  const wrap =
+    document.getElementById('cam-wrap');
+  // Remove old stream if reconnecting
+  if (camImg) {
+    wrap.removeChild(camImg);
+    camImg = null;
+  }
+  const placeholder =
+    document.getElementById('cam-placeholder');
+  // Create image element dynamically
+  camImg = document.createElement('img');
+  camImg.alt = 'ESP32-CAM live feed';
+  // Stream loaded successfully
+  camImg.onload = () => {
+    placeholder.style.display = 'none';
+    document.getElementById('cam-status').textContent =
+      'Streaming';
+  };
+  
+  // Stream error
+  camImg.onerror = () => {
+    placeholder.style.display = 'block';
+    document.getElementById('cam-status').textContent =
+      'Stream error';
+  };
+
+  // ESP32 camera streaming URL
+  camImg.src =
+    'http://' + espIp + ':81/stream?' + Date.now();
+  camImg.style.display = 'block';
+  wrap.appendChild(camImg);
+}
+
+
+// CONNECT BUTTON FUNCTION- Initializes ESP32 communication
+function connect() {
+  const input =
+    document.getElementById('esp-ip')
+    .value
+    .trim();
+  // Validate IP input
+  if (!input) {
+    addLog(
+      'Please enter the ESP32 IP address first.',
+      'log-info'
+    );
+    return;
+  }
+  espIp     = input;
+  startTime = Date.now();
+  reads     = 0;
+  alerts    = 0;
+  connected = true;
+  addLog(
+    'Connecting to ESP32 at ' + espIp + '...',
+    'log-info'
+  );
+
+  // Start camera stream
+  setupCamera();
+  // Restart polling if reconnecting
+  if (pollId)
+    clearInterval(pollId);
+  // Fetch data immediately
+  fetchData();
+  // Fetch sensor data every 2 seconds
+  pollId = setInterval(fetchData, 2000);
+}
+</script>
+</body>
+</html>
